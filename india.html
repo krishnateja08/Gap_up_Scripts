@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gap Scanner — 30 Aug 2026</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: #0b0d12;
+    color: #e7e9ee;
+    margin: 0;
+    padding: 28px 16px 60px;
+  }
+  .container { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px 0; }
+  h2 { font-size: 15px; margin: 0 0 14px 0; letter-spacing: 0.02em; }
+  .subtitle { color: #9aa1ac; font-size: 13px; margin-bottom: 4px; }
+  .clocks { color: #6b7280; font-size: 12px; margin-bottom: 22px; }
+  .clocks span { font-variant-numeric: tabular-nums; }
+
+  /* ── Overview bar ── */
+  .overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #14161c;
+    border: 1px solid #21242c;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: #9aa1ac; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 700; }
+  .stat-value.up { color: #3ecf8e; }
+  .stat-value.down { color: #ff6b6b; }
+  .stat-sub { font-size: 11px; color: #6b7280; margin-top: 4px; }
+  .sentiment-bar { height: 6px; border-radius: 3px; background: #262a33; overflow: hidden; margin-top: 8px; }
+  .sentiment-fill { height: 100%; background: linear-gradient(90deg, #3ecf8e, #6ee7b7); }
+
+  /* ── Section wrapper ── */
+  section { margin-bottom: 30px; }
+  .section-title { display: flex; align-items: center; gap: 8px; }
+  .count-pill {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700;
+    background: #1a1d24; border: 1px solid #262a33; color: #9aa1ac;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%; border-collapse: collapse; background: #14161c;
+    border-radius: 10px; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+  }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.04em; color: #9aa1ac; padding: 10px 14px;
+    background: #1a1d24; border-bottom: 1px solid #262a33;
+  }
+  tbody td { padding: 10px 14px; font-size: 13.5px; border-bottom: 1px solid #1c1f26; vertical-align: middle; }
+  tr.gap-up { background: rgba(62, 207, 142, 0.07); }
+  tr.gap-down { background: rgba(255, 107, 107, 0.07); }
+  tr:hover { filter: brightness(1.15); }
+  .ticker { font-weight: 700; }
+  .ticker-sub { font-size: 11px; color: #6b7280; font-weight: 400; }
+  .num { font-variant-numeric: tabular-nums; }
+  .gap-val { font-weight: 700; font-size: 15px; }
+  .gap-val.up { color: #3ecf8e; }
+  .gap-val.down { color: #ff6b6b; }
+
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 10.5px; font-weight: 600; background: #21242c; color: #9aa1ac;
+  }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+  }
+  .badge.strong { background: rgba(62, 207, 142, 0.20); color: #3ecf8e; }
+  .badge.moderate { background: rgba(250, 204, 21, 0.18); color: #facc15; }
+  .badge.weak { background: rgba(148, 163, 184, 0.18); color: #94a3b8; }
+  .badge.heavy { background: rgba(255, 107, 107, 0.20); color: #ff6b6b; }
+  .badge.medium { background: rgba(250, 204, 21, 0.18); color: #facc15; }
+  .badge.mild { background: rgba(148, 163, 184, 0.18); color: #94a3b8; }
+  .shock { color: #facc15; font-size: 11px; font-weight: 700; margin-left: 4px; }
+
+  .vol-bar-track { width: 70px; height: 6px; background: #21242c; border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .vol-bar-fill { height: 100%; }
+  .vol-bar-fill.up { background: #3ecf8e; }
+  .vol-bar-fill.down { background: #ff6b6b; }
+  .vol-bar-fill.neutral { background: #6b7280; }
+
+  .empty { padding: 30px; text-align: center; color: #9aa1ac; background: #14161c; border-radius: 10px; font-size: 13px; }
+
+  /* ── Sector heatmap ── */
+  .heatmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .heat-cell { border-radius: 8px; padding: 10px 12px; border: 1px solid #21242c; }
+  .heat-sector { font-size: 11px; color: #cbd2db; font-weight: 700; margin-bottom: 4px; }
+  .heat-value { font-size: 15px; font-weight: 700; }
+  .heat-count { font-size: 10.5px; color: #6b7280; margin-top: 2px; }
+
+  /* ── Distribution bar ── */
+  .dist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+  .dist-label { width: 60px; color: #9aa1ac; flex-shrink: 0; }
+  .dist-track { flex: 1; display: flex; height: 16px; border-radius: 4px; overflow: hidden; background: #1a1d24; }
+  .dist-up { background: #3ecf8e; }
+  .dist-down { background: #ff6b6b; }
+  .dist-count { width: 70px; text-align: right; color: #9aa1ac; flex-shrink: 0; }
+
+  footer { margin-top: 10px; font-size: 11.5px; color: #4b5563; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 Gap Scanner — NSE</h1>
+  <div class="subtitle">Report generated 30 Aug 2026, 03:39 PM · Threshold: ±0.5%</div>
+  <div class="clocks">🕐 IST: <span id="clock-ist">--:--:--</span> &nbsp;|&nbsp; UTC: <span id="clock-utc">--:--:--</span> &nbsp;|&nbsp; Auto-refresh in <span id="refresh-countdown">--</span>s</div>
+
+  <div class="overview">
+    <div class="stat-card">
+      <div class="stat-label">Scanned</div>
+      <div class="stat-value">107</div>
+      <div class="stat-sub">stocks + ETFs/indices</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Gap Up</div>
+      <div class="stat-value up">21 ▲</div>
+      <div class="stat-sub">81% of gappers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Gap Down</div>
+      <div class="stat-value down">5 ▼</div>
+      <div class="stat-sub">19% of gappers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Market Sentiment</div>
+      <div class="stat-value" style="color:#3ecf8e">Bullish</div>
+      <div class="sentiment-bar"><div class="sentiment-fill" style="width:81%"></div></div>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-title"><h2>🟢 Bullish — Gap Up</h2><span class="count-pill">21</span></div>
+  <table>
+    <thead>
+      <tr><th>Ticker</th><th>Gap %</th><th>Prev Close</th><th>Today Open</th><th>Volume vs Avg</th><th>Momentum</th></tr>
+    </thead>
+    <tbody>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">CANBK</div>
+        <div class="ticker-sub">PSU_BANK</div>
+      </td>
+      <td class="gap-val up">+1.53%</td>
+      <td class="num">129.45</td>
+      <td class="num">131.43</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:34%"></span></span>
+        <span class="num">1.0x</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">INFY</div>
+        <div class="ticker-sub">IT</div>
+      </td>
+      <td class="gap-val up">+1.15%</td>
+      <td class="num">1110.80</td>
+      <td class="num">1123.60</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:43%"></span></span>
+        <span class="num">1.3x</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">LODHA</div>
+        <div class="ticker-sub">CONS</div>
+      </td>
+      <td class="gap-val up">+1.10%</td>
+      <td class="num">1246.30</td>
+      <td class="num">1260.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:26%"></span></span>
+        <span class="num">0.8x</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">WIPRO</div>
+        <div class="ticker-sub">IT</div>
+      </td>
+      <td class="gap-val up">+1.05%</td>
+      <td class="num">176.40</td>
+      <td class="num">178.25</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:74%"></span></span>
+        <span class="num">2.2x</span> <span class="shock">⚡ Vol Shock</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">TCS</div>
+        <div class="ticker-sub">IT</div>
+      </td>
+      <td class="gap-val up">+1.05%</td>
+      <td class="num">2248.40</td>
+      <td class="num">2272.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:62%"></span></span>
+        <span class="num">1.9x</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">VEDL</div>
+        <div class="ticker-sub">METALS</div>
+      </td>
+      <td class="gap-val up">+0.96%</td>
+      <td class="num">281.00</td>
+      <td class="num">283.70</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:48%"></span></span>
+        <span class="num">1.4x</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">TECHM</div>
+        <div class="ticker-sub">IT</div>
+      </td>
+      <td class="gap-val up">+0.95%</td>
+      <td class="num">1585.00</td>
+      <td class="num">1600.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:67%"></span></span>
+        <span class="num">2.0x</span> <span class="shock">⚡ Vol Shock</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">APOLLOHOSP</div>
+        <div class="ticker-sub">PHARMA</div>
+      </td>
+      <td class="gap-val up">+0.94%</td>
+      <td class="num">8766.50</td>
+      <td class="num">8849.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:31%"></span></span>
+        <span class="num">0.9x</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">HINDZINC</div>
+        <div class="ticker-sub">METALS</div>
+      </td>
+      <td class="gap-val up">+0.92%</td>
+      <td class="num">610.10</td>
+      <td class="num">615.70</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:24%"></span></span>
+        <span class="num">0.7x</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">ZYDUSLIFE</div>
+        <div class="ticker-sub">PHARMA</div>
+      </td>
+      <td class="gap-val up">+0.87%</td>
+      <td class="num">1150.00</td>
+      <td class="num">1160.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:90%"></span></span>
+        <span class="num">2.7x</span> <span class="shock">⚡ Vol Shock</span>
+      </td>
+      <td><span class="badge moderate">Moderate</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">LTM</div>
+        <div class="ticker-sub">IT</div>
+      </td>
+      <td class="gap-val up">+0.78%</td>
+      <td class="num">4460.00</td>
+      <td class="num">4494.60</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:9%"></span></span>
+        <span class="num">0.3x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">BAJAJ-AUTO</div>
+        <div class="ticker-sub">AUTO</div>
+      </td>
+      <td class="gap-val up">+0.77%</td>
+      <td class="num">11720.00</td>
+      <td class="num">11810.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:44%"></span></span>
+        <span class="num">1.3x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">JSWSTEEL</div>
+        <div class="ticker-sub">METALS</div>
+      </td>
+      <td class="gap-val up">+0.75%</td>
+      <td class="num">1341.00</td>
+      <td class="num">1351.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:46%"></span></span>
+        <span class="num">1.4x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">HCLTECH</div>
+        <div class="ticker-sub">IT</div>
+      </td>
+      <td class="gap-val up">+0.62%</td>
+      <td class="num">1282.00</td>
+      <td class="num">1290.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:75%"></span></span>
+        <span class="num">2.2x</span> <span class="shock">⚡ Vol Shock</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">HINDALCO</div>
+        <div class="ticker-sub">METALS</div>
+      </td>
+      <td class="gap-val up">+0.59%</td>
+      <td class="num">1024.00</td>
+      <td class="num">1030.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:18%"></span></span>
+        <span class="num">0.5x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">ONGC</div>
+        <div class="ticker-sub">OIL&GAS</div>
+      </td>
+      <td class="gap-val up">+0.58%</td>
+      <td class="num">232.00</td>
+      <td class="num">233.35</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:19%"></span></span>
+        <span class="num">0.6x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">DLF</div>
+        <div class="ticker-sub">CONS</div>
+      </td>
+      <td class="gap-val up">+0.57%</td>
+      <td class="num">676.15</td>
+      <td class="num">680.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:11%"></span></span>
+        <span class="num">0.3x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">TATACAP</div>
+        <div class="ticker-sub">FIN_SERVICE</div>
+      </td>
+      <td class="gap-val up">+0.54%</td>
+      <td class="num">370.65</td>
+      <td class="num">372.65</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:53%"></span></span>
+        <span class="num">1.6x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">ASIANPAINT</div>
+        <div class="ticker-sub">CONS</div>
+      </td>
+      <td class="gap-val up">+0.53%</td>
+      <td class="num">2631.00</td>
+      <td class="num">2645.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:32%"></span></span>
+        <span class="num">0.9x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">GODREJCP</div>
+        <div class="ticker-sub">FMCG</div>
+      </td>
+      <td class="gap-val up">+0.52%</td>
+      <td class="num">923.00</td>
+      <td class="num">927.80</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:23%"></span></span>
+        <span class="num">0.7x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td>
+        <div class="ticker">HDFCLIFE</div>
+        <div class="ticker-sub">FIN_SERVICE</div>
+      </td>
+      <td class="gap-val up">+0.51%</td>
+      <td class="num">548.00</td>
+      <td class="num">550.80</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill up" style="width:27%"></span></span>
+        <span class="num">0.8x</span>
+      </td>
+      <td><span class="badge weak">Weak</span></td>
+    </tr>
+    </tbody>
+  </table>
+  </section>
+  <section>
+    <div class="section-title"><h2>🔴 Bearish — Gap Down</h2><span class="count-pill">5</span></div>
+  <table>
+    <thead>
+      <tr><th>Ticker</th><th>Gap %</th><th>Prev Close</th><th>Today Open</th><th>Volume vs Avg</th><th>Risk</th></tr>
+    </thead>
+    <tbody>
+    <tr class="gap-down">
+      <td>
+        <div class="ticker">BAJFINANCE</div>
+        <div class="ticker-sub">FIN_SERVICE</div>
+      </td>
+      <td class="gap-val down">-1.60%</td>
+      <td class="num">1083.00</td>
+      <td class="num">1065.70</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill down" style="width:40%"></span></span>
+        <span class="num">1.2x</span>
+      </td>
+      <td><span class="badge medium">Medium</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td>
+        <div class="ticker">BAJAJHLDNG</div>
+        <div class="ticker-sub">OTHER</div>
+      </td>
+      <td class="gap-val down">-0.87%</td>
+      <td class="num">11540.00</td>
+      <td class="num">11440.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill down" style="width:36%"></span></span>
+        <span class="num">1.1x</span>
+      </td>
+      <td><span class="badge mild">Mild</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td>
+        <div class="ticker">ADANIGREEN</div>
+        <div class="ticker-sub">POWER</div>
+      </td>
+      <td class="gap-val down">-0.65%</td>
+      <td class="num">1328.50</td>
+      <td class="num">1319.80</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill down" style="width:20%"></span></span>
+        <span class="num">0.6x</span>
+      </td>
+      <td><span class="badge mild">Mild</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td>
+        <div class="ticker">ICICIBANK</div>
+        <div class="ticker-sub">PVT_BANK</div>
+      </td>
+      <td class="gap-val down">-0.55%</td>
+      <td class="num">1443.00</td>
+      <td class="num">1435.00</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill down" style="width:39%"></span></span>
+        <span class="num">1.2x</span>
+      </td>
+      <td><span class="badge mild">Mild</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td>
+        <div class="ticker">PNB</div>
+        <div class="ticker-sub">PSU_BANK</div>
+      </td>
+      <td class="gap-val down">-0.51%</td>
+      <td class="num">115.40</td>
+      <td class="num">114.81</td>
+      <td>
+        <span class="vol-bar-track"><span class="vol-bar-fill down" style="width:27%"></span></span>
+        <span class="num">0.8x</span>
+      </td>
+      <td><span class="badge mild">Mild</span></td>
+    </tr>
+    </tbody>
+  </table>
+  </section>
+  <section>
+    <div class="section-title"><h2>📈 Indices & BEES</h2><span class="count-pill">11</span></div>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Gap %</th><th>Volume vs Avg</th><th>Market Bias</th></tr>
+    </thead>
+    <tbody>
+    <tr class="gap-up">
+      <td><div class="ticker">NIFTY IT</div><div class="ticker-sub">CNXIT</div></td>
+      <td><span class="tag">INDEX</span></td>
+      <td class="gap-val up">+0.90%</td>
+      <td class="num">1.9x</td>
+      <td><span class="tag" style="color:#3ecf8e">Strong Bullish</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td><div class="ticker">NIFTY PHARMA</div><div class="ticker-sub">CNXPHARMA</div></td>
+      <td><span class="tag">INDEX</span></td>
+      <td class="gap-val up">+0.22%</td>
+      <td class="num">1.0x</td>
+      <td><span class="tag" style="color:#3ecf8e">Neutral</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td><div class="ticker">BANK NIFTY</div><div class="ticker-sub">NSEBANK</div></td>
+      <td><span class="tag">INDEX</span></td>
+      <td class="gap-val down">-0.14%</td>
+      <td class="num">1.1x</td>
+      <td><span class="tag" style="color:#ff6b6b">Neutral</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td><div class="ticker">NIFTY 50</div><div class="ticker-sub">NSEI</div></td>
+      <td><span class="tag">INDEX</span></td>
+      <td class="gap-val up">+0.13%</td>
+      <td class="num">1.2x</td>
+      <td><span class="tag" style="color:#3ecf8e">Neutral</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td><div class="ticker">Auto ETF</div><div class="ticker-sub">AUTOBEES</div></td>
+      <td><span class="tag">BEES</span></td>
+      <td class="gap-val up">+1.00%</td>
+      <td class="num">1.1x</td>
+      <td><span class="tag" style="color:#3ecf8e">Strong Bullish</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td><div class="ticker">Banking ETF</div><div class="ticker-sub">BANKBEES</div></td>
+      <td><span class="tag">BEES</span></td>
+      <td class="gap-val up">+0.07%</td>
+      <td class="num">0.8x</td>
+      <td><span class="tag" style="color:#3ecf8e">Neutral</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td><div class="ticker">Gold ETF</div><div class="ticker-sub">GOLDBEES</div></td>
+      <td><span class="tag">BEES</span></td>
+      <td class="gap-val down">-0.85%</td>
+      <td class="num">1.4x</td>
+      <td><span class="tag" style="color:#ff6b6b">Strong Bearish</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td><div class="ticker">IT ETF</div><div class="ticker-sub">ITBEES</div></td>
+      <td><span class="tag">BEES</span></td>
+      <td class="gap-val up">+1.01%</td>
+      <td class="num">0.9x</td>
+      <td><span class="tag" style="color:#3ecf8e">Strong Bullish</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td><div class="ticker">Nifty 50 ETF</div><div class="ticker-sub">NIFTYBEES</div></td>
+      <td><span class="tag">BEES</span></td>
+      <td class="gap-val down">-0.36%</td>
+      <td class="num">1.5x</td>
+      <td><span class="tag" style="color:#ff6b6b">Mild Bearish</span></td>
+    </tr>
+    <tr class="gap-up">
+      <td><div class="ticker">Pharma ETF</div><div class="ticker-sub">PHARMABEES</div></td>
+      <td><span class="tag">BEES</span></td>
+      <td class="gap-val up">+1.45%</td>
+      <td class="num">1.2x</td>
+      <td><span class="tag" style="color:#3ecf8e">Strong Bullish</span></td>
+    </tr>
+    <tr class="gap-down">
+      <td><div class="ticker">Silver ETF</div><div class="ticker-sub">SILVERBEES</div></td>
+      <td><span class="tag">BEES</span></td>
+      <td class="gap-val down">-0.53%</td>
+      <td class="num">1.2x</td>
+      <td><span class="tag" style="color:#ff6b6b">Mild Bearish</span></td>
+    </tr>
+    </tbody>
+  </table>
+  </section>
+  <section>
+    <h2>🗺️ Sector Heatmap <span style="color:#6b7280;font-weight:400">(avg gap % across all scanned stocks per sector)</span></h2>
+  <div class="heatmap">
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.29)">
+      <div class="heat-sector">IT</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.93%</div>
+      <div class="heat-count">6 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.22)">
+      <div class="heat-sector">METALS</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.59%</div>
+      <div class="heat-count">7 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.17)">
+      <div class="heat-sector">CONS</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.37%</div>
+      <div class="heat-count">7 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.16)">
+      <div class="heat-sector">PSU_BANK</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.30%</div>
+      <div class="heat-count">5 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.16)">
+      <div class="heat-sector">PHARMA</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.30%</div>
+      <div class="heat-count">8 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.16)">
+      <div class="heat-sector">AUTO</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.29%</div>
+      <div class="heat-count">10 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.15)">
+      <div class="heat-sector">FMCG</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.23%</div>
+      <div class="heat-count">9 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.11)">
+      <div class="heat-sector">OIL&GAS</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.07%</div>
+      <div class="heat-count">5 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(62, 207, 142, 0.11)">
+      <div class="heat-sector">INFRA</div>
+      <div class="heat-value" style="color:#3ecf8e">+0.05%</div>
+      <div class="heat-count">12 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(148, 163, 184, 0.10)">
+      <div class="heat-sector">FIN_SERVICE</div>
+      <div class="heat-value" style="color:#94a3b8">-0.00%</div>
+      <div class="heat-count">13 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(255, 107, 107, 0.12)">
+      <div class="heat-sector">CEMENT</div>
+      <div class="heat-value" style="color:#ff6b6b">-0.08%</div>
+      <div class="heat-count">4 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(255, 107, 107, 0.12)">
+      <div class="heat-sector">POWER</div>
+      <div class="heat-value" style="color:#ff6b6b">-0.11%</div>
+      <div class="heat-count">6 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(255, 107, 107, 0.12)">
+      <div class="heat-sector">PVT_BANK</div>
+      <div class="heat-value" style="color:#ff6b6b">-0.12%</div>
+      <div class="heat-count">4 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(255, 107, 107, 0.13)">
+      <div class="heat-sector">TELECOM</div>
+      <div class="heat-value" style="color:#ff6b6b">-0.14%</div>
+      <div class="heat-count">1 stocks</div>
+    </div>
+    <div class="heat-cell" style="background:rgba(255, 107, 107, 0.13)">
+      <div class="heat-sector">OTHER</div>
+      <div class="heat-value" style="color:#ff6b6b">-0.17%</div>
+      <div class="heat-count">3 stocks</div>
+    </div>
+  </div>
+  </section>
+  <section>
+    <h2>📶 Gap Size Distribution</h2>
+  <div class="dist-row">
+    <div class="dist-label">0.5–1%</div>
+    <div class="dist-track">
+      <div class="dist-up" style="width:80%"></div>
+      <div class="dist-down" style="width:20%"></div>
+    </div>
+    <div class="dist-count">16▲ / 4▼</div>
+  </div>
+  <div class="dist-row">
+    <div class="dist-label">1–2%</div>
+    <div class="dist-track">
+      <div class="dist-up" style="width:25%"></div>
+      <div class="dist-down" style="width:5%"></div>
+    </div>
+    <div class="dist-count">5▲ / 1▼</div>
+  </div>
+  <div class="dist-row">
+    <div class="dist-label">2–5%</div>
+    <div class="dist-track">
+      <div class="dist-up" style="width:0%"></div>
+      <div class="dist-down" style="width:0%"></div>
+    </div>
+    <div class="dist-count">0▲ / 0▼</div>
+  </div>
+  <div class="dist-row">
+    <div class="dist-label">5%+</div>
+    <div class="dist-track">
+      <div class="dist-up" style="width:0%"></div>
+      <div class="dist-down" style="width:0%"></div>
+    </div>
+    <div class="dist-count">0▲ / 0▼</div>
+  </div>
+  </section>
+  <footer>Generated automatically by gap_scanner.py · Data via Yahoo Finance (yfinance) · No pre-market data used</footer>
+</div>
+<script>
+  const REFRESH_SECONDS = 300;
+  let remaining = REFRESH_SECONDS;
+
+  function updateClocks() {
+    const now = new Date();
+    document.getElementById('clock-ist').textContent =
+      now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+    document.getElementById('clock-utc').textContent =
+      now.toLocaleTimeString('en-GB', { timeZone: 'UTC', hour12: false });
+  }
+
+  function tickRefresh() {
+    remaining -= 1;
+    if (remaining <= 0) {
+      location.reload();
+      return;
+    }
+    document.getElementById('refresh-countdown').textContent = remaining;
+  }
+
+  updateClocks();
+  document.getElementById('refresh-countdown').textContent = remaining;
+  setInterval(updateClocks, 1000);
+  if (REFRESH_SECONDS > 0) {
+    setInterval(tickRefresh, 1000);
+  } else {
+    document.getElementById('refresh-countdown').textContent = 'off';
+  }
+</script>
+
+</body>
+</html>
