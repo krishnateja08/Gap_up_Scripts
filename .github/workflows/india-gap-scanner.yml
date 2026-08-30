@@ -6,7 +6,7 @@ on:
     # NOTE: GitHub Actions cron is UTC and does not observe IST (no DST for
     # India, so this offset is fixed year-round). Actions cron jobs can also
     # be delayed by a few minutes during high load — that's normal.
-    - cron: '50 3 * * 1-5'
+    - cron: '50 2 * * 1-5'
   workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
 
 permissions:
