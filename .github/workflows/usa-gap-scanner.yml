@@ -14,7 +14,7 @@ on:
   workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
 
 permissions:
-  contents: read
+  contents: write   # needed so the workflow can push to the gh-pages branch
 
 jobs:
   run-usa-scanner:
@@ -56,3 +56,21 @@ jobs:
           name: gap-report-usa-${{ github.run_id }}
           path: gap_report_usa.html
           retention-days: 14
+
+      - name: Publish report to GitHub Pages (stable link)
+        if: always()
+        run: |
+          mkdir -p publish
+          cp gap_report_usa.html publish/usa.html
+        # 'publish' becomes the folder pushed to the gh-pages branch below.
+        # Result: a stable URL that always shows the LATEST run's report —
+        # https://<your-username>.github.io/<your-repo>/usa.html
+
+      - name: Deploy to gh-pages branch
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./publish
+          destination_dir: .
+          keep_files: true
