@@ -1,0 +1,54 @@
+name: India Gap Scanner
+
+on:
+  schedule:
+    # 09:20 IST (NSE opens 09:15 IST) = 03:50 UTC, Mon–Fri.
+    # NOTE: GitHub Actions cron is UTC and does not observe IST (no DST for
+    # India, so this offset is fixed year-round). Actions cron jobs can also
+    # be delayed by a few minutes during high load — that's normal.
+    - cron: '50 3 * * 1-5'
+  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  run-india-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests yfinance
+
+      - name: Write config.json from secrets
+        run: |
+          cat <<EOF > config.json
+          {
+            "telegram_bot_token": "${TELEGRAM_BOT_TOKEN}",
+            "telegram_chat_id": "${TELEGRAM_CHAT_ID}",
+            "gap_threshold_pct": ${GAP_THRESHOLD_PCT},
+            "refresh_interval_sec": 300
+          }
+          EOF
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GAP_THRESHOLD_PCT: ${{ vars.GAP_THRESHOLD_PCT || '0.5' }}
+
+      - name: Run India gap scanner
+        run: python gap_scanner_india.py
+
+      - name: Upload HTML report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gap-report-india-${{ github.run_id }}
+          path: gap_report.html
+          retention-days: 14
