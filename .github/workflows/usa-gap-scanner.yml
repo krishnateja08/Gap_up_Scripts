@@ -1,0 +1,58 @@
+name: USA Gap Scanner
+
+on:
+  schedule:
+    # NYSE/Nasdaq open 09:30 ET. GitHub cron is UTC and the US observes DST,
+    # so ET's UTC offset changes twice a year — two cron lines cover both:
+    #   13:35 UTC = 09:35 EDT (roughly mid-Mar to early-Nov)
+    #   14:35 UTC = 09:35 EST (roughly early-Nov to mid-Mar)
+    # Only one of these will actually land at ~market-open at any given time
+    # of year; the other fires ~1hr off and is effectively a no-op if you
+    # want to skip it (or just leave both — it just runs the scan again).
+    - cron: '35 13 * * 1-5'
+    - cron: '35 14 * * 1-5'
+  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  run-usa-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests yfinance
+
+      - name: Write config.json from secrets
+        run: |
+          cat <<EOF > config.json
+          {
+            "telegram_bot_token": "${TELEGRAM_BOT_TOKEN}",
+            "telegram_chat_id": "${TELEGRAM_CHAT_ID}",
+            "gap_threshold_pct": ${GAP_THRESHOLD_PCT},
+            "refresh_interval_sec": 300
+          }
+          EOF
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GAP_THRESHOLD_PCT: ${{ vars.GAP_THRESHOLD_PCT || '0.5' }}
+
+      - name: Run USA gap scanner
+        run: python gap_scanner_usa.py
+
+      - name: Upload HTML report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gap-report-usa-${{ github.run_id }}
+          path: gap_report_usa.html
+          retention-days: 14
